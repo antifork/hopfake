@@ -1,6 +1,10 @@
 CHANGES
 --------------------------------------------------------------------------------
 
+v1.5 2003/07/14
+
+ - interface addr lookup without the buggy pcap_findalldevs function
+
 v1.4 2003/01/30
  
  - fixed a problem with echo-reply icmp packets

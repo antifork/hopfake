@@ -2,7 +2,7 @@
  *  $Id$
  *
  *  
- *  Copyright (c) 2003 Dallachiesa Michele <xenion@acidlife.com>
+ *  Copyright (c) 2003 Dallachiesa Michele <xenion@antifork.org>
  *  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -42,15 +42,19 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <signal.h>
-#include <pcap.h>
+#include <errno.h>
+#include <syslog.h>
+#include <fcntl.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
 #include <netinet/tcp.h>
+#include <sys/types.h>
+#include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <errno.h>
-#include <syslog.h>
+#include <net/if.h>
+#include <pcap.h>
 #include "bpf.h"
 
 
@@ -61,13 +65,15 @@
 #define REDNULL " > /dev/null 2> /dev/null"
 #define SYSTEM_RULES(x) { mysystem(IPTABLES_PATH "-%c OUTPUT -s %s -p icmp --icmp-type port-unreachable -m ttl --ttl %d -j DROP" REDNULL,x,ipfromlong(interface_addr),KNTTL); mysystem(IPTABLES_PATH "-%c OUTPUT -s %s -p icmp --icmp-type echo-reply -m ttl --ttl %d -j DROP" REDNULL,x,ipfromlong(interface_addr),KNTTL); }
 
+#define DEBUG
+
 #ifndef DEBUG
 #define LOG(arg...) syslog(LOG_DAEMON | LOG_INFO, ## arg)
 #else
 #define LOG(arg...) {printf(## arg);printf("\n");}
 #endif
 
-#define VERSION "1.4"
+#define VERSION "1.5"
 
 #define SIZEOF_IPHEADER(x) ((x->ip_hl) << 2)
 #define SIZEOF_IPOPTIONS(x) (SIZEOF_IPHEADER(x)-sizeof(struct ip))
@@ -359,7 +365,6 @@ main(int argc, char **argv)
      */
 
     return 0;
-
 }
 
 
@@ -512,38 +517,6 @@ sigdie(int signo)
 }
 
 
-u_int32_t
-get_interface_addr(char *interface)
-{
-    pcap_if_t      *dev,
-                   *alldevs;
-    u_int32_t       ret;
-
-    if (strcmp("lo", interface) == 0)
-	return (htonl(INADDR_LOOPBACK));
-
-    if (pcap_findalldevs(&alldevs, errbuf) < 0)
-	fatal("pcap_findalldevs(): %s", errbuf);
-
-    ret = INADDR_NONE;
-
-    for (dev = alldevs; dev->next; dev = dev->next)
-	if (strcmp(dev->name, interface) == 0)
-	    if (dev->addresses)
-		if (dev->addresses->addr)
-		    ret =
-			((struct sockaddr_in *) (dev->addresses->addr))->
-			sin_addr.s_addr;
-
-    pcap_freealldevs(alldevs);
-
-    if (ret == INADDR_NONE)
-	fatal("get_interface_addr(): address not found");
-
-    return ret;
-}
-
-
 unsigned short
 in_cksum(unsigned short *addr, int len)
 {
@@ -576,6 +549,7 @@ in_cksum(unsigned short *addr, int len)
     answer = ~sum;		/* truncate to 16 bits */
     return (answer);
 }
+
 
 void
 init_opt(int argc, char **argv)
@@ -620,15 +594,15 @@ init_opt(int argc, char **argv)
 
     if (unreach_icmp_code > 15)
 	fatal("unreachable icmp code not valid");
-
 }
+
 
 void
 help()
 {
     int             i;
 
-    printf("hopfake v%s by xenion@acidlife.com\n\n", VERSION);
+    printf("hopfake v%s by xenion@antifork.org\n\n", VERSION);
     printf("USAGE: hopfake [options]\n\n");
     printf("-i interface                        listen on interface\n");
     printf("-c hops-file                        the hops-file pathname\n");
@@ -641,10 +615,8 @@ help()
 	printf("%2d  %-20s  %2d  %s\n", i, ICMPCODE_NAME(i), i + 1,
 	       ICMPCODE_NAME(i + 1));
     printf("\n");
-
     exit(0);
 }
-
 
 
 int
@@ -670,7 +642,77 @@ mysystem(char *pattern, ...)
 	z = -2;
 
     return z;
+}
 
+
+u_int32_t
+get_interface_addr(char *ifname)
+{				/* thanks awgn ;)
+				 * http://awgn.antifork.org/codes/if.c */
+    char            buffer[10240];
+    int             sd;
+    struct ifreq   *ifr,
+                   *iflast;
+    struct ifconf   ifc;
+    struct sockaddr_in *ptr_if;
+
+
+    memset(buffer, 0, 10240);
+
+    /*
+     * dummy dgram socket for ioctl 
+     */
+
+    if ((sd = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+	fatal("socket(): %s", strerror(errno));
+
+    ifc.ifc_len = sizeof(buffer);
+    ifc.ifc_buf = buffer;
+
+    /*
+     * getting ifs: this fills ifconf structure. 
+     */
+
+    if (ioctl(sd, SIOCGIFCONF, &ifc) < 0) {
+	close(sd);
+	fatal("ioctl(): %s", strerror(errno));
+    }
+
+    close(sd);
+
+    /*
+     * line_up ifreq structure 
+     */
+
+    ifr = (struct ifreq *) buffer;
+    iflast = (struct ifreq *) ((char *) buffer + ifc.ifc_len);
+
+    if ((sd = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+	fatal("socket(): %s", strerror(errno));
+
+#if HAVE_SOCKADDR_SALEN
+    for (; ifr < iflast;
+	 (char *) ifr += sizeof(ifr->ifr_name) + ifr->ifr_addr.sa_len)
+#else
+    for (; ifr < iflast;
+	 (char *) ifr +=
+	 sizeof(ifr->ifr_name) + sizeof(struct sockaddr_in))
+#endif
+    {
+	if (*(char *) ifr) {
+	    ptr_if = (struct sockaddr_in *) &ifr->ifr_addr;
+
+	    if (!strcmp(ifname, ifr->ifr_name)) {
+		close(sd);
+		return (ptr_if->sin_addr.s_addr);
+	    }
+
+
+	}
+    }
+
+    close(sd);
+    return INADDR_NONE;
 }
 
 /*
