@@ -65,7 +65,7 @@
 #define REDNULL " > /dev/null 2> /dev/null"
 #define SYSTEM_RULES(x) { mysystem(IPTABLES_PATH "-%c OUTPUT -s %s -p icmp --icmp-type port-unreachable -m ttl --ttl %d -j DROP" REDNULL,x,ipfromlong(interface_addr),KNTTL); mysystem(IPTABLES_PATH "-%c OUTPUT -s %s -p icmp --icmp-type echo-reply -m ttl --ttl %d -j DROP" REDNULL,x,ipfromlong(interface_addr),KNTTL); }
 
-#define DEBUG
+// #define DEBUG
 
 #ifndef DEBUG
 #define LOG(arg...) syslog(LOG_DAEMON | LOG_INFO, ## arg)
