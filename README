@@ -71,7 +71,7 @@ syslog.
   in pseudo-random order.
 
 
-----[ FAQ
+----[ solve your problems
 
   - try to update libpcap
   - check IPTABLES_PATH
