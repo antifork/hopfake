@@ -67,7 +67,7 @@
 #define LOG(arg...) {printf(## arg);printf("\n");}
 #endif
 
-#define VERSION "1.3"
+#define VERSION "1.4"
 
 #define SIZEOF_IPHEADER(x) ((x->ip_hl) << 2)
 #define SIZEOF_IPOPTIONS(x) (SIZEOF_IPHEADER(x)-sizeof(struct ip))
@@ -229,14 +229,20 @@ main(int argc, char **argv)
 
 	pktip = (struct ip *) ((void *) packet);
 
+	if (pktip->ip_p == IPPROTO_ICMP) {
+	    pkticmp =
+		(struct icmp *) ((void *) packet + SIZEOF_IPHEADER(pktip));
+	    if (pkticmp->icmp_type == ICMP_ECHO
+		&& pktip->ip_ttl > n_fake_hops + 1)
+		pktip->ip_ttl = n_fake_hops + 1;	/* thanks Thor */
+	}
+
+
 	if (pktip->ip_ttl <= n_fake_hops + 1) {
 
 	    switch (pktip->ip_p) {
 
 	    case IPPROTO_ICMP:
-		pkticmp =
-		    (struct icmp *) ((void *) packet +
-				     SIZEOF_IPHEADER(pktip));
 		if (pkticmp->icmp_type != ICMP_ECHO
 		    || pkthdr.caplen > sizeof buf)
 		    type = '?';
