@@ -1,0 +1,75 @@
+HopFake v1.3
+--------------------------------------------------------------------------------
+
+If someone traceroutes your ip you can log the attempt and also add some fake 
+hops. Different traceroute types are recognized and supported: 'P':udp,
+'T':tcp, 'E':icmp-echo, '?':others. Runs daemonized and logs everything to
+syslog.
+
+
+----[ How it works
+
+  The port-unreachable and echo-reply icmp packets sent by our kernel have
+  ttl==64 so we can drop those packets through the iptables ttl module.
+  When packets with ttl < N (where N is the no. of fake hops) Hopfake sends
+  spoofed icmp packets with type=ICMP_TIME_EXCEEDED and code=ICMP_EXC_TTL.
+  When the last hop is reached, HopFake sends different packets as last
+  packet. Latency is simulated with a call to usleep(n) (where n is the 
+  actual fake-hop no.).
+
+
+----[ Configuration
+
+  the hops-file format is simple: every line that doesn't begin with a 
+  digit is ignored. Only the standard numbers-and-dots notation is
+  recognized.
+    
+
+
+----[ Example
+
+  * on my tty1:
+
+     root@arilinn:~/dev/hopfake# ./hopfake -i ppp0 -c hops-file-example
+     root@arilinn:~/dev/hopfake#
+
+  * someone traceroutes my ip..:
+
+     Shoikan:~# traceroute 80.117.106.213
+     traceroute to 80.117.106.213 (80.117.106.213), 30 hops max, 38 byte packets
+      1  192.168.100.1 (192.168.100.1)  32.645 ms  34.634 ms  31.854 ms
+      2  r-to70-vl14.opb.interbusiness.it (80.18.136.17)  31.343 ms  31.802 ms  33.892 ms
+      3  r-to70-to88.opb.interbusiness.it (151.99.98.13)  32.142 ms  30.030 ms  32.148 ms
+      4  r-mi256-to70.opb.interbusiness.it (151.99.101.101)  36.166 ms  38.982 ms  34.769 ms
+      5  r-mi208-mi256.opb.interbusiness.it (80.17.211.66)  38.150 ms  36.432 ms  35.642 ms
+      6  r-bz13-mi208.opb.interbusiness.it (151.99.99.78)  144.137 ms  42.344 ms  41.907 ms
+      7  217.141.106.133 (217.141.106.133)  41.702 ms  53.466 ms  41.629 ms
+      8  spider.ncts.navy.mil (138.147.50.5)  170.159 ms  125.330 ms  230.036 ms
+      9  www.army.mil (140.183.234.10)  225.420 ms  146.783 ms  163.860 ms
+     10  darpademo1.darpa.mil (192.5.18.104)  125.847 ms  340.187 ms  149.609 ms
+     11  iso.darpa.mil (192.5.18.105)  120.384 ms  147.911 ms  272.156 ms
+     12  demosparc.darpa.mil (192.5.18.106)  203.113 ms  126.097 ms  150.091 ms
+     13  dtsn.darpa.mil (192.5.18.107)  140.113 ms  205.133 ms  229.886 ms
+     14  daml.darpa.mil (192.5.18.108)  180.110 ms  143.423 ms  121.637 ms
+     15  border.hcn.hq.nasa.gov (198.116.142.1)  203.670 ms  197.419 ms  139.894 ms
+     16  foundation.hq.nasa.gov (198.116.142.34)  139.574 ms  129.631 ms  219.586 ms
+     17  host213-106.pool80117.interbusiness.it (80.117.106.213)  191.816 ms  156.515 ms  146.091 ms
+     Shoikan:~#
+
+  * on my tty12:
+
+     Jan 17 01:53:05 arilinn hopfake: starting HopFake
+     Jan 17 01:53:05 arilinn hopfake: 9 fake hops loaded
+     Jan 17 01:53:05 arilinn hopfake: listening for traceroutes on ppp0.
+     Jan 17 01:54:04 arilinn hopfake: detected traceroute from 62.211.148.7 (U)
+     Jan 17 01:54:10 arilinn last message repeated 2 times
+
+
+----[ greetz
+
+  The antifork.it cvs, a big 31338 code resource :^) and #phrack.it guys
+  in pseudo-random order.
+
+
+--------------------------------------------------------------------------------
+                                                                             EOF
