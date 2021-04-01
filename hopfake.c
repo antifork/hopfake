@@ -70,7 +70,7 @@
 #ifndef DEBUG
 #define LOG(arg...) syslog(LOG_DAEMON | LOG_INFO, ## arg)
 #else
-#define LOG(arg...) {printf(## arg);printf("\n");}
+#define LOG(arg...) {printf(arg);printf("\n");}
 #endif
 
 #define VERSION "1.5"
