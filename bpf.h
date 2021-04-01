@@ -39,8 +39,6 @@
  *
  */
 
-#include <net/bpf.h>
-
 #define AP_DLT_NULL		0	/* no link-layer encapsulation */
 #define AP_DLT_EN10MB		1	/* Ethernet (10Mb) */
 #define AP_DLT_EN3MB		2	/* Experimental Ethernet (3Mb) */
