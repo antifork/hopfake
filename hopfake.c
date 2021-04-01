@@ -692,11 +692,12 @@ get_interface_addr(char *ifname)
 
 #if HAVE_SOCKADDR_SALEN
     for (; ifr < iflast;
-	 (char *) ifr += sizeof(ifr->ifr_name) + ifr->ifr_addr.sa_len)
+        ifr = (void *) ifr +
+        sizeof(ifr->ifr_name) + ifr->ifr_addr.sa_len)
 #else
     for (; ifr < iflast;
-	 (char *) ifr +=
-	 sizeof(ifr->ifr_name) + sizeof(struct sockaddr_in))
+        ifr = (void *) ifr +
+        sizeof(ifr->ifr_name) + sizeof(struct sockaddr_in))
 #endif
     {
 	if (*(char *) ifr) {
